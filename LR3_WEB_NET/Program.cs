@@ -2,7 +2,7 @@
 
 class Program
 {
-    static private int RandomizerCeil = 4;
+    static private int RandomizerCeil = 3;
     static private Random Randomizer;
     static private List<List<int>> Ints;
     static Barrier Barrier;
@@ -22,8 +22,7 @@ class Program
     {
 
         Randomizer = new Random();
-        var s = Program.Randomizer.Next(3, RandomizerCeil);
-        Ints = new(3);
+        Ints = new(Program.Randomizer.Next(3, RandomizerCeil));
         Barrier = new Barrier(Ints.Capacity + 1);
         Main2();
     }
@@ -53,7 +52,7 @@ class Program
         var index = (int)threadData;
         lock (Program.Ints)
         {
-            Program.Ints.Add(new(Program.Randomizer.Next(3, RandomizerCeil)));
+            Program.Ints.Add(new(Program.Randomizer.Next(1, RandomizerCeil)));
         }
         ConsoleWriteLine($"Created list for index # {index}");
         Barrier.SignalAndWait();
@@ -79,7 +78,18 @@ class Program
         //Console.WriteLine($"Inside a task to calculate list # {indexOfListToParse}");
         var listToParse = Program.Ints[indexOfListToParse];
         var sum = (double)listToParse.Sum();
-        return sum / listToParse.Count;
+        return sum;
+    };
+
+    static Func<object?, int> GetListCount = (object? taskData) =>
+    {
+
+        if (taskData is not int)
+        {
+            throw new ArgumentException("For getting list count out of lists, an index is required");
+        }
+        var index = (int)taskData;
+        return Program.Ints[index].Count;
     };
 
     static async Task<double> CalculateListsAverage()
@@ -100,7 +110,24 @@ class Program
             await calcAverageTasks[i];
             sum += calcAverageTasks[i].Result;
         }
-        return (double)(sum) / Program.Ints.Count;
+
+        var countSum = 0;
+        List<Task<int>> calcCountsTasks = new List<Task<int>>();
+        Parallel.For(0, Program.Ints.Count, (index) =>
+        {
+            Console.WriteLine($"Adding a task to a task list to get list items count # {index}");
+            lock (calcCountsTasks)
+            {
+                calcCountsTasks.Add(Task<int>.Factory.StartNew(GetListCount, index));
+            }
+        });
+        for (int i = 0; i < calcCountsTasks.Count; i++)
+        {
+            await calcCountsTasks[i];
+            countSum += calcCountsTasks[i].Result;
+        }
+
+        return (double)(sum) / countSum;
     }
     static void FillLists()
     {
