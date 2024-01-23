@@ -24,7 +24,7 @@ class Program
         Randomizer = new Random();
         Ints = new(Program.Randomizer.Next(3, RandomizerCeil));
         Barrier = new Barrier(Ints.Capacity + 1);
-        Main2();
+        Task.WaitAll(Main2());
     }
     static void FillSingleList(object? threadData)
     {
@@ -68,14 +68,13 @@ class Program
 
     }
 
-    static Func<object?, double> CalculateListAverage = (object? taskData) =>
+    static Func<object?, double> CalculateListSum = (object? taskData) =>
     {
         if (taskData is not int)
         {
             throw new ArgumentException("For calculating average an index is required");
         }
         var indexOfListToParse = (int)taskData;
-        //Console.WriteLine($"Inside a task to calculate list # {indexOfListToParse}");
         var listToParse = Program.Ints[indexOfListToParse];
         var sum = (double)listToParse.Sum();
         return sum;
@@ -101,14 +100,13 @@ class Program
             Console.WriteLine($"Adding a task to a task list to calculate list # {index}");
             lock (calcAverageTasks)
             {
-                calcAverageTasks.Add(Task<double>.Factory.StartNew(CalculateListAverage, index));
+                calcAverageTasks.Add(Task<double>.Factory.StartNew(CalculateListSum, index));
             }
         });
         var sum = 0d;
         for (int i = 0; i < calcAverageTasks.Count; i++)
         {
-            await calcAverageTasks[i];
-            sum += calcAverageTasks[i].Result;
+            sum += await calcAverageTasks[i];
         }
 
         var countSum = 0;
@@ -123,8 +121,7 @@ class Program
         });
         for (int i = 0; i < calcCountsTasks.Count; i++)
         {
-            await calcCountsTasks[i];
-            countSum += calcCountsTasks[i].Result;
+            countSum += await calcCountsTasks[i];
         }
 
         return (double)(sum) / countSum;
@@ -148,7 +145,7 @@ class Program
         Barrier.SignalAndWait();
         PrintListOfLists(Ints);
 
-        var average = CalculateListsAverage().Result;
+        var average = await CalculateListsAverage();
         Console.WriteLine($"Average: {average}");
         Console.ReadKey();
     }
